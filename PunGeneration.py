@@ -1,13 +1,23 @@
 import requests
 import json
+import pickle
+import random
 
 ## pun code
 
 def findSubject():
-    return "potato"
+    #read from the noun list
+    nouns = pickle.load( open( "nouns", "rb" ))
+    choiceIndex = random.randrange(0, len(nouns))
+    word = nouns[choiceIndex]
+    return word.replace('\n','')
 
-def findActionOrLocation(subject):
-    return "space"
+def findActionOrLocation():
+    #read from the action word list
+    words = pickle.load( open( "actions", "rb" ))
+    choiceIndex = random.randrange(0, len(words))
+    word = words[choiceIndex]
+    return word.replace('\n','')
 
 def findWordsSimilarTo(word):
     res = requests.get("https://api.datamuse.com/words?ml="+word).json()
@@ -37,15 +47,17 @@ def findSynonymsTo(word):
 
 def buildPun():
     subject = findSubject()
-    actionOrLocation = findActionOrLocation(subject)
+    actionOrLocation = findActionOrLocation()
 
     createPunAnswer(subject, actionOrLocation)
 
 def createPunAnswer(subject, actionOrLocation):
     subjectActionOptionPairs = {}
-    #similar_to_subject = findWordsSimilarTo(subject)
-    similar_to_subject = findSynonymsTo(subject)
+    similar_to_subject = findWordsSimilarTo(subject)
+    #similar_to_subject = findSynonymsTo(subject)
     similar_to_actionOrLocation = findWordsSimilarTo(actionOrLocation)
+    #print(similar_to_subject)
+    #print(similar_to_actionOrLocation)
     for similarSubjectWord in similar_to_subject:
         subjectActionOptionPairs[similarSubjectWord] = {}
         for similarActOrLocWord in similar_to_actionOrLocation:
@@ -91,7 +103,7 @@ def findSubstring(string1, string2):
 
 
 def combineWords(subject, actionOrLocation, substring):
-    print("trying to join: " + subject + " , and " + actionOrLocation + " at substring: " + substring)
+    #print("trying to join: " + subject + " , and " + actionOrLocation + " at substring: " + substring)
     #The word with the syllable accuring earlier in the string is our inserter 
     #  which will be inserted into the other word
     subIndex = subject.find(substring)
@@ -180,22 +192,23 @@ def searchForBestAnswer(answers):
     bestScore = 0
     bestAnswer = ""
     answers = []
+    #print(scoredAnswers)
     for answer in scoredAnswers:
         if answer[1] > bestScore:
             bestScore = answer[1]
             bestAnswer = answer[0]
         if answer[1] == bestScore:
             answers.append(answer[0])
-    print(answers)
+    #print(answers)
     return bestAnswer
 
 def constructSentence(subject, actOrLocation, bestAnswer):
     sentence = "What do you call a "
     sentence = sentence + subject + " "
-    if True: #isLocation(actOrLocation):
+    if False: #isLocation(actOrLocation):
         sentence = sentence + "in "
     else:
-        sentence = sentence + "that can"
+        sentence = sentence + "that can "
     
     sentence = sentence + actOrLocation + "?"
     sentence = sentence + " " + bestAnswer + "."
@@ -203,20 +216,38 @@ def constructSentence(subject, actOrLocation, bestAnswer):
 
 subject = 'potato'
 actOrLocation = 'space'
-answers = createPunAnswer(subject, actOrLocation)
-bestAnswer = searchForBestAnswer(answers)
+#answers = createPunAnswer(subject, actOrLocation)
+#bestAnswer = searchForBestAnswer(answers)
 
-sentence = constructSentence(subject, actOrLocation, bestAnswer)
-print(sentence)
+#sentence = constructSentence(subject, actOrLocation, bestAnswer)
+#print(sentence)
 
-subject = 'barbarian'
-actOrLocation = "that you can't see"
-answers = createPunAnswer(subject, actOrLocation)
+#subject = 'barbarian'
+#actOrLocation = "that you can't see"
+#answers = createPunAnswer(subject, actOrLocation)
 #print(answers)
-bestAnswer = searchForBestAnswer(answers)
+#bestAnswer = searchForBestAnswer(answers)
 
-sentence = constructSentence(subject, actOrLocation, bestAnswer)
-print(sentence)
+#sentence = constructSentence(subject, actOrLocation, bestAnswer)
+#print(sentence)
+lines = ""
+index = 0
+while index < 100:
+    subject = findSubject()
+    actOrLocation = findActionOrLocation()
+    #print("what do you call a " + subject + " that can " + actOrLocation + "?")
+    answers = createPunAnswer(subject, actOrLocation)
+    #print(answers)
+    bestAnswer = searchForBestAnswer(answers)
+
+    sentence = constructSentence(subject, actOrLocation, bestAnswer)
+    if (bestAnswer != ""):
+        index +=1
+        lines = lines + sentence + '\n'
+
+fp = open('output.txt', 'a')
+fp.write(lines)
+fp.close()
 
 #TestyBois
 #print(findSubstringBetweenSubjectandActionOrLocation('visigoth', 'invisible'))
