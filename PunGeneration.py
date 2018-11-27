@@ -19,6 +19,7 @@ def findActionOrLocation():
     word = words[choiceIndex]
     return word.replace('\n','')
 
+#Query the DataMuse API and retrieve words similar to the input word
 def findWordsSimilarTo(word):
     res = requests.get("https://api.datamuse.com/words?ml="+word).json()
     words = []
@@ -37,6 +38,7 @@ def findWordsSimilarTo(word):
     #print(words)
     return words
 
+#Query the DataMuse API for synonyms to the provided word
 def findSynonymsTo(word):
     res = requests.get("https://api.datamuse.com/words?rel_syn="+word).json()
     words = []
@@ -45,30 +47,37 @@ def findSynonymsTo(word):
             words.append(wor['word'])
     return words
 
+#Find a subject, and action or location word, and build a pun
 def buildPun():
     subject = findSubject()
     actionOrLocation = findActionOrLocation()
 
-    createPunAnswer(subject, actionOrLocation)
+    answers = createPunAnswer(subject, actOrLocation)
+    bestAnswer = searchForBestAnswer(answers)
 
+    sentence = constructSentence(subject, actOrLocation, bestAnswer)
+    print(sentence)
+
+#given a subject word, and an action or a location, retrieve similar words, and compare them until a suitable answer is created to the pun
+# Candidate answers are retrieved if a common sequence of characters is identified, if so, the shorter word is inserted into the larger word as a candidate answer
+# Each answer is saved and scored
 def createPunAnswer(subject, actionOrLocation):
     subjectActionOptionPairs = {}
     similar_to_subject = findWordsSimilarTo(subject)
-    #similar_to_subject = findSynonymsTo(subject)
     similar_to_actionOrLocation = findWordsSimilarTo(actionOrLocation)
-    #print(similar_to_subject)
-    #print(similar_to_actionOrLocation)
+
     for similarSubjectWord in similar_to_subject:
         subjectActionOptionPairs[similarSubjectWord] = {}
         for similarActOrLocWord in similar_to_actionOrLocation:
             subjectActionOptionPairs[similarSubjectWord][similarActOrLocWord] = []
             substrings = findSubstringBetweenSubjectandActionOrLocation(similarSubjectWord, similarActOrLocWord)
-            #print(substrings)
             for substring in substrings:
                 subjectActionOptionPairs[similarSubjectWord][similarActOrLocWord].append(combineWords(similarSubjectWord, similarActOrLocWord, substring))
 
     return subjectActionOptionPairs
 
+#Searches for a common string of characters between the subject and the action or location
+#  Each substring found is returned
 def findSubstringBetweenSubjectandActionOrLocation(subject, actionOrLocation):
     substrings = []
     #search for the shorter string in the longer string
@@ -88,20 +97,17 @@ def findSubstringBetweenSubjectandActionOrLocation(subject, actionOrLocation):
 #find a substring longer than 3 characters that is common between both strings
 def findSubstring(string1, string2):
     index = string2.find(string1[0])
-    #print("found " + string1 + " in " + string2 + " at " + str(index))
     end = index
     for i in range(index, min(len(string1), len(string2))):
         if string1[i] == string2[i]:
-            #print(string1[i] + " == " + string2[i])
             end+=1
         else:
             break
-    #print(end - index)
     if end - index >= 3:
         return string1[index:end]
     return False
 
-
+#given a common substring shared between subject and action or location, insert the smaller word into the larger word at the index of that substring
 def combineWords(subject, actionOrLocation, substring):
     #print("trying to join: " + subject + " , and " + actionOrLocation + " at substring: " + substring)
     #The word with the syllable accuring earlier in the string is our inserter 
@@ -114,29 +120,24 @@ def combineWords(subject, actionOrLocation, substring):
         root = subject
         inserter = actionOrLocation
         index = subIndex
-        #print("greater")
     else:
         root = actionOrLocation
         inserter = subject
         index = actIndex
-        #print("less than")
 
     #Prepending
     if root.find(substring) == 0:
-        #print("prepend")
         combined = root[index+len(inserter):]
         combined = inserter + combined
 
     #inserting
     else:
-        #print("insert")
         combined = root[:index]
         combined = combined + inserter
-    #print(root)
-    #print(inserter)
     
     return combined
 
+#Score each answer based on length, difference between subject and actOrLoc, and grammatical correctness
 def scoringFunction(subject, actOrLocation, answer):
     answerLength = len(answer)
 
@@ -159,6 +160,8 @@ def scoringFunction(subject, actOrLocation, answer):
     score = (differenceScore + lengthScore + grammarScore)/3
     return score
 
+#Generate a score based on how different the answer is from the subject and actionOrLocation, if the answer is between 25% and 50% different
+# give the answer a score of 1, otherwise give the answer a score of zero
 def scoreDifference(subject, actOrLocation, answer):
     answerLength = len(answer)
     iterationLength = min(len(subject), answerLength)
@@ -176,6 +179,11 @@ def scoreDifference(subject, actOrLocation, answer):
             actOrLocCount += 1
     
     differenceScore = 0
+
+    #if the answer is the same as the subject or location, return a 0
+    if subjectDiffCount/answerLength == 11 or actOrLocCount/answerLength == 1:
+        return 0
+
     if (subjectDiffCount/answerLength >= 0.25 and subjectDiffCount/answerLength <= 0.5):
         differenceScore = 1
     if (actOrLocCount/answerLength >= 0.25 and actOrLocCount/answerLength <= 0.5):
@@ -183,6 +191,7 @@ def scoreDifference(subject, actOrLocation, answer):
     
     return differenceScore
 
+#loop through each answer and its score, and return the answer with the highest score
 def searchForBestAnswer(answers):
     scoredAnswers = []
     for key in answers:
@@ -192,16 +201,17 @@ def searchForBestAnswer(answers):
     bestScore = 0
     bestAnswer = ""
     answers = []
-    #print(scoredAnswers)
+
     for answer in scoredAnswers:
         if answer[1] > bestScore:
             bestScore = answer[1]
             bestAnswer = answer[0]
         if answer[1] == bestScore:
             answers.append(answer[0])
-    #print(answers)
+
     return bestAnswer
 
+#given a subject and an action or a location, build the pun question and answer to complete the problem
 def constructSentence(subject, actOrLocation, bestAnswer):
     sentence = "What do you call a "
     sentence = sentence + subject + " "
